@@ -3,7 +3,9 @@ const mongoose = require('mongoose');
 const dotenv = require('dotenv');
 const bodyParser = require('body-parser');
 const { body, validationResult } = require("express-validator");
+const bcrypt = require('bcryptjs');
 
+const User = require('./models/user');
 
 dotenv.config();
 const app = express();
@@ -12,7 +14,14 @@ app.use(bodyParser.json());
 app.post('/auth/signup', [
   body('email')
     .isEmail()
-    .withMessage('Please type valid email'),
+    .withMessage('Please type valid email')
+    .custom((value) => {
+        return User.findOne({ email: value }).then((userDoc) => {
+            if (userDoc) {
+                return Promise.reject('E-Mail address already exists!');
+            }
+        });
+    }),
   body('password')
     .trim()
     .isLength({ min: 6 })
@@ -21,22 +30,39 @@ app.post('/auth/signup', [
     .trim()
     .not().isEmpty()
     .withMessage('Name field is required')
-], (req, res, next) => {
+], async (req, res, next) => {
     const errors = validationResult(req);
 
     if (!errors.isEmpty()) {
         const error = new Error('Validation failed');
         error.statusCode = 422;
         error.data = errors.array();
-        throw error;
+        return next(error);
     }
-    console.log(req.body);
     const email = req.body.email;
     const password = req.body.password;
     const name = req.body.name;
-    res.json({
-        message: 'success'
-    })
+
+    try {
+        const hashedPassword = await bcrypt.hash(password, 12);
+
+        const user = new User({
+            email,
+            password: hashedPassword,
+            name
+        });
+
+        const result = await user.save();
+        res.status(201).json({
+            message: "User created",
+            user: result
+        })
+    } catch (err) {
+       if (!err.statusCode) {
+           err.statusCode = 500;
+       }
+       next(err);
+    }
 });
 
 app.use((error, req, res, next) => {
