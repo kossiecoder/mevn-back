@@ -4,12 +4,14 @@ const dotenv = require('dotenv');
 const bodyParser = require('body-parser');
 const { body, validationResult } = require("express-validator");
 const bcrypt = require('bcryptjs');
+const cors = require('cors');
 
 const User = require('./models/user');
 
 dotenv.config();
 const app = express();
 app.use(bodyParser.json());
+app.use(cors());
 
 app.post('/auth/signup', [
   body('email')
@@ -55,7 +57,7 @@ app.post('/auth/signup', [
         const result = await user.save();
         res.status(201).json({
             message: "User created",
-            user: result
+            userId: result._id
         })
     } catch (err) {
        if (!err.statusCode) {
